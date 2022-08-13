@@ -2,7 +2,9 @@ from picamera2 import Picamera2, Preview
 import time
 import numpy as np
 # import cv2 as cv2
-from PIL import Image
+from PIL import Image, GifImagePlugin
+
+GifImagePlugin.LOADING_STRATEGY = 2
 
 picam2 = Picamera2()
 
@@ -24,31 +26,37 @@ width = 512
 height = 256
 
 # Load the arbitrarily sized image
-img = Image.open('a1.gif')
+src = Image.open('trans/donut_trans.gif')
+src2 = Image.open('a2.gif')
+src3 = Image.open('a3.gif')
 # Create an image padded to the required size with
 # mode 'RGB'
 pad = Image.new('RGBA', (
-    ((img.size[0] + width-1) // width) * width,
-    ((img.size[1] + height-1) // height) * height,
+    ((src.size[0] + width-1) // width) * width,
+    ((src.size[1] + height-1) // height) * height,
     ))
+
+src.info['transparency'] = 255
+src.info['background'] = 0
+src.convert('RGBA')
 
 while 1:
     
-    frameIdx = img.tell()
-    print(frameIdx)
-    if frameIdx >= img.n_frames-1:
-        img.seek(0)
+    frameIdx = src.tell()
+
+    # print(img.getbbox())
+    if frameIdx >= src.n_frames-1:
+        src.seek(0)
         frameIdx = 0
     
-    # Paste the original image into the padded one
-    pad.paste(img, (300,32))
-    img.seek(frameIdx+1)
-
-# Add the overlay with the padded image as the source,
-# but the original image's dimensions
-    picam2.set_overlay(np.array(pad))
     
-# By default, the overlay is in layer 0, beneath the
+    ## pad.alpha_composite(src)
+    # Paste the original image into the padded one
+    pad.paste(src) #, (0, 0, 540, 540))
+    picam2.set_overlay(np.array(pad))
+    src.seek(frameIdx+1)
+#     
+# # By default, the overlay is in layer 0, beneath the
 # preview (which defaults to layer 2). Here we make
 # the new overlay semi-transparent, then move it above
 # the preview
