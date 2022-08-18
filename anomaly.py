@@ -9,12 +9,15 @@ import numpy as np
 # import cv2 as cv2
 from PIL import Image, GifImagePlugin
 
-time.sleep(20)
+
 
 # TODO
 #  - use EventHandlers and callbacks to draw gifs
-#  - run camera feed without X-windows
-#  - adjust exposure time to time of day
+#  - run camera feed without X11?
+#  - ensure exposure is auto adjusted, else adjust exposure time to time of day
+
+# Sleep to allow X11 to finish booting
+time.sleep(20)
 
 GifImagePlugin.LOADING_STRATEGY = 2
 width = 1920
@@ -22,15 +25,10 @@ height = 1080
 
 picam2 = Picamera2()
 
-# camera_config = picam2.create_preview_configuration()
-# picam2.configure(camera_config)
-# picam2.start_preview(Preview.QTGL)
-# picam2.start()
-# time.sleep(2)
-# picam2.capture_file("test.jpg")
+
 
 config = picam2.create_preview_configuration(main={"size": (width,height)})
-config["transform"] = libcamera.Transform(hflip=1)
+#config["transform"] = libcamera.Transform(hflip=1) #dont need
 
 picam2.configure(config)
 #encoder = H264Encoder(repeat=True, iperiod=15)
@@ -91,7 +89,7 @@ def playGif(src, loops=1, intro=20):
 
         
 playFrame(src1)
-time.sleep(60)
+time.sleep(20)
    
         ## pad.alpha_composite(src)
         # Paste the original image into the padded one

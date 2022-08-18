@@ -1,5 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Anomaly
-Exec=lxterminal --command"/bin/bash -c 'sudo /home/cmk/Documents/anomaly/anomaly.sh &'"
-Terminal=true
