@@ -17,7 +17,7 @@ from PIL import Image, GifImagePlugin
 #  - ensure exposure is auto adjusted, else adjust exposure time to time of day
 
 # Sleep to allow X11 to finish booting
-time.sleep(20)
+# time.sleep(20)
 
 GifImagePlugin.LOADING_STRATEGY = 2
 width = 1920
@@ -85,11 +85,11 @@ def playGif(src, loops=1, intro=20):
        playFrame(src)
        
         
-   picam2.set_overlay(blank) 
+   picam2.set_overlay(None) 
 
         
-playFrame(src1)
-time.sleep(20)
+# playFrame(src1)
+# time.sleep(20)
    
         ## pad.alpha_composite(src)
         # Paste the original image into the padded one
