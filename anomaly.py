@@ -9,6 +9,8 @@ import numpy as np
 # import cv2 as cv2
 from PIL import Image, GifImagePlugin
 
+time.sleep(20)
+
 # TODO
 #  - use EventHandlers and callbacks to draw gifs
 #  - run camera feed without X-windows
@@ -88,8 +90,8 @@ def playGif(src, loops=1, intro=20):
    picam2.set_overlay(blank) 
 
         
-#playFrame(src1)
-# time.sleep(30)
+playFrame(src1)
+time.sleep(60)
    
         ## pad.alpha_composite(src)
         # Paste the original image into the padded one
