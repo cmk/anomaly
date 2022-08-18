@@ -1,0 +1,3 @@
+[Desktop Entry]
+Exec=lxterminal --command"/bin/bash -c 'sudo /usr/bin/python3 /home/cmk/Documents/anomaly/anomaly.py &'"
+Terminal=true

@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 from picamera2 import Picamera2, Preview
 from picamera2.encoders import H264Encoder
 import time
@@ -13,6 +15,8 @@ from PIL import Image, GifImagePlugin
 #  - adjust exposure time to time of day
 
 GifImagePlugin.LOADING_STRATEGY = 2
+width = 1920
+height = 1080
 
 picam2 = Picamera2()
 
@@ -23,32 +27,35 @@ picam2 = Picamera2()
 # time.sleep(2)
 # picam2.capture_file("test.jpg")
 
-config = picam2.create_preview_configuration(main={"size": (1920,1080)})
+config = picam2.create_preview_configuration(main={"size": (width,height)})
 config["transform"] = libcamera.Transform(hflip=1)
 
 picam2.configure(config)
 #encoder = H264Encoder(repeat=True, iperiod=15)
-
-picam2.start_preview(Preview.QTGL, width=1920,height=1080)
+#with picam2.constrols as ctl:
+#    ctl.ExposureTime
+picam2.start_preview(Preview.QTGL, width=width,height=height)
 picam2.start()
 
 #picam2.configure("preview")
-#picam2.start(show_preview=True)
+#picam2.stfart(show_preview=True)
 
 
 #overlay[:150, 200:] = (255, 0, 0, 64) # reddish
 #overlay[150:, :200] = (0, 255, 0, 64) # greenish
 #overlay[150:, 200:] = (0, 0, 255, 64) # blueish
 
-width = 1920
-height = 1080
+
 blank = np.zeros((height, width, 4), dtype=np.uint8)
 blank[:,:] = (0,0,0,0)
+# blank[500:, :500] = (255, 0, 0, 128)
+# picam2.set_overlay(blank)
 
+path = '/home/cmk/Documents/anomaly/gifs/'
 # Load the arbitrarily sized image
-src1 = Image.open('gifs/A1.gif')
+src1 = Image.open(path+'A1.gif')
 #src2 = Image.open('gifs/a2.gif')
-src3 = Image.open('gifs/A3.gif')
+#src3 = Image.open('gifs/A3.gif')
 
 # mask = Image.open('mask.png')
 
@@ -56,7 +63,7 @@ src3 = Image.open('gifs/A3.gif')
 def playFrame(src, start=0):
     
     # Create an image padded to the required size with mode 'RGB'
-    pad = Image.new('RGBA', (1920, 1080))
+    pad = Image.new('RGBA', (width, height))
 #         ((src.size[0] + width-1) // width) * width,
 #         ((src.size[1] + height-1) // height) * height,
 #         ))
@@ -74,7 +81,6 @@ def playFrame(src, start=0):
 
 def playGif(src, loops=1, intro=20):
     
-    
    for i in range(0, min(intro, src.n_frames)):
        playFrame(src)
        
@@ -82,7 +88,9 @@ def playGif(src, loops=1, intro=20):
    picam2.set_overlay(blank) 
 
         
-        
+#playFrame(src1)
+# time.sleep(30)
+   
         ## pad.alpha_composite(src)
         # Paste the original image into the padded one
 
