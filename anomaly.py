@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import keyboard
 import time
 import sys
 
@@ -10,7 +11,7 @@ from picamera2.encoders import H264Encoder
 # import libcamera as lc
 import numpy as np
 import serial as sp
-import random as rng
+import random as gn
 
 # import cv2 as cv2
 from PIL import Image, GifImagePlugin
@@ -20,16 +21,28 @@ path = '/home/cmk/Documents/anomaly/gifs/'
 GifImagePlugin.LOADING_STRATEGY = 2
 
 # Image constants
-width = 1920 // 2
-height = 1080 // 2
-hires = {"size": (width,height)}
-lores = {"size": (width//8,height//8), "format": "YUV420"}
-
+redux = 2
+pixw = 1920 # width * redux
+pixh = 1080 # height * redux
+width = pixw // redux
+height = pixh // redux
+center = (width//2,height//2)
+hires = {"size": (pixw,pixh)}
+lores = {"size": (width,height), "format": "YUV420"}
 
 # Compass variables        
-lower = 320
-upper = lower + 40
+fovmax = 360 # field of view
+offset = 0
+margin = 30
 trigger = 0
+
+# Load the images
+intro = Image.open(path + 'intro.gif')
+gifs = []
+
+for i in range(1, 3):
+    gif = Image.open(path + 'A' + str(i) + '.gif')
+    gifs.append(gif)
 
 # mask = Image.open('mask.png')
 
@@ -43,13 +56,7 @@ trigger = 0
 # time.sleep(20)
 
 
-# Load the images
-intro = Image.open(path + 'intro.gif')
-src1 = Image.open(path + 'A1.gif')
-src2 = Image.open(path + 'A2.gif')
-#src3 = Image.open('gifs/A3.gif')
-
-rng.seed()
+gn.seed()
 compass = sp.Serial(port = "/dev/ttyACM0", baudrate=9600, bytesize=8, timeout=2)
 # serialPort.open()
 
@@ -62,7 +69,8 @@ picam2.configure(config)
 #encoder = H264Encoder(repeat=True, iperiod=15)
 #with picam2.constrols as ctl:
 #    ctl.ExposureTime
-picam2.start_preview(Preview.DRM, x=width, y=height, width=width,height=height)
+# picam2.start_preview(Preview.DRM, x=pixw, y=pixh, width=pixw, height=pixh)
+picam2.start_preview(Preview.DRM, width=width, height=height)
 picam2.start()
 
 #picam2.configure("preview")
@@ -75,73 +83,88 @@ picam2.start()
 # picam2.set_overlay(blank)
 
 
+    
+def window(phi):
+
+    return min(fovmax, abs(phi))
+
+def travel(phi):
+
+    midpoint = fovmax // 2
+
+    if phi > midpoint:
+        return gn.randint(0, midpoint - margin)
+
+    return gn.randint(midpoint + margin, fovmax)
 
 def getHeading(port):
     
     try:
         raw = port.readline().rstrip()
-        return int(raw[0:4].decode("utf-8"))
+        return int(raw[0:4].decode("utf-8")) + offset
     
     except:
-        return 60 # 2 o'clock
+        return fovmax // 2 # center of view
 
-def close(h1, h2, tol=10):
+def close(h1, h2):
     
-    return abs(h1 - h2) < tol
+    return abs(h1 - h2) < margin
 
-
-def playFrame(src, start=0):
+def playFrame(gif):
     
     # Create an image padded to the required size with mode 'RGB'
     pad = Image.new('RGBA', (width, height))
     # pad = Image.new('RGBA', (500, 500))
-#         ((src.size[0] + width-1) // width) * width,
-#         ((src.size[1] + height-1) // height) * height,
+#         ((gif.size[0] + width-1) // width) * width,
+#         ((gif.size[1] + height-1) // height) * height,
 #         ))
 
-    frameIdx = src.tell()
-    if frameIdx >= src.n_frames-1:
-        src.seek(start)
-        frameIdx = start
+    frameIdx = gif.tell()
+    if frameIdx >= gif.n_frames-1:
+        frameIdx = 0
+        gif.seek(frameIdx)
 
-    pad.paste(src) #, (0, 0, 540, 540))
+    # pad.paste(gif, center)
+    pad.paste(gif)
     picam2.set_overlay(np.array(pad))
     
-    src.seek(frameIdx+1)
+    gif.seek(frameIdx+1)
 
 
-def playGif(src, loops=1, intro=0):
+def playGif(gif, loops=1):
     
-    for i in range(0, max(intro, src.n_frames)):
-        playFrame(src)
+    for i in range(0, max(0, gif.n_frames)):
+        playFrame(gif)
        
     picam2.set_overlay(None) 
 
-def playSeq(src, intro, loops=1):
+def playSeq(gif, intro, loops=1):
     
     playGif(intro, 1)
-    playGif(src, loops)
-    
+    playGif(gif, loops)
+
 
 while 1:
+
+    if (keyboard.is_pressed('q')):
+        sys.exit()
      
     if(compass.in_waiting > 0):
          
         # time.sleep(0.1)
         heading = getHeading(compass)
-        # print(heading)
+        print(heading)
         
         if close(trigger, heading):
             
             print("Playing Gif sequence")
-            playSeq(src2, intro, 1)
-            trigger = rng.randint(heading + 20, heading + 100) % 360
+            gif = gn.choice(gifs)
+            playSeq(gif, intro, 1)
+            trigger = travel(heading)
             print("new trigger")
             print(trigger)
             print("done")
         
-        
-# playFrame(src1)
 # time.sleep(60)
 # 
             
