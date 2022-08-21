@@ -1,8 +1,12 @@
 #!/usr/bin/python3
 
+import time
+import sys
+
+sys.path.insert(1, '/home/cmk/Documents/picamera2')
+
 from picamera2 import Picamera2, Preview
 from picamera2.encoders import H264Encoder
-import time
 # import libcamera as lc
 import numpy as np
 import serial as sp
@@ -11,14 +15,33 @@ import random as rng
 # import cv2 as cv2
 from PIL import Image, GifImagePlugin
 
+# Gif constants
 path = '/home/cmk/Documents/anomaly/gifs/'
 GifImagePlugin.LOADING_STRATEGY = 2
 
-#width = 1920
-#height = 1080
+# Image constants
+width = 1920 // 2
+height = 1080 // 2
+hires = {"size": (width,height)}
+lores = {"size": (width//8,height//8), "format": "YUV420"}
 
-width = 1920 // 8
-height = 1080 // 8
+
+# Compass variables        
+lower = 320
+upper = lower + 40
+trigger = 0
+
+# mask = Image.open('mask.png')
+
+# TODO
+#  - run camera feed without X11?
+#  - ensure exposure is auto adjusted, else adjust exposure time to time of day
+#  - use server / EventHandlers and callbacks to draw gifs
+#    python should only process/insert images when triggered: picam2.post_callback = playFrame ?
+
+# Sleep to allow X11 to finish booting
+# time.sleep(20)
+
 
 # Load the images
 intro = Image.open(path + 'intro.gif')
@@ -26,30 +49,20 @@ src1 = Image.open(path + 'A1.gif')
 src2 = Image.open(path + 'A2.gif')
 #src3 = Image.open('gifs/A3.gif')
 
-# mask = Image.open('mask.png')
-
-# TODO
-#  - use EventHandlers and callbacks to draw gifs
-#  - run camera feed without X11?
-#  - ensure exposure is auto adjusted, else adjust exposure time to time of day
-
-# Sleep to allow X11 to finish booting
-# time.sleep(20)
-
 rng.seed()
 compass = sp.Serial(port = "/dev/ttyACM0", baudrate=9600, bytesize=8, timeout=2)
 # serialPort.open()
 
 
 picam2 = Picamera2()
-config = picam2.create_preview_configuration(main={"size": (width,height)})
+config = picam2.create_preview_configuration(main=lores)
 #config["transform"] = libcamera.Transform(hflip=1) #dont need
 
 picam2.configure(config)
 #encoder = H264Encoder(repeat=True, iperiod=15)
 #with picam2.constrols as ctl:
 #    ctl.ExposureTime
-picam2.start_preview(Preview.QTGL, width=width,height=height)
+picam2.start_preview(Preview.DRM, x=width, y=height, width=width,height=height)
 picam2.start()
 
 #picam2.configure("preview")
@@ -63,10 +76,25 @@ picam2.start()
 
 
 
+def getHeading(port):
+    
+    try:
+        raw = port.readline().rstrip()
+        return int(raw[0:4].decode("utf-8"))
+    
+    except:
+        return 60 # 2 o'clock
+
+def close(h1, h2, tol=10):
+    
+    return abs(h1 - h2) < tol
+
+
 def playFrame(src, start=0):
     
     # Create an image padded to the required size with mode 'RGB'
     pad = Image.new('RGBA', (width, height))
+    # pad = Image.new('RGBA', (500, 500))
 #         ((src.size[0] + width-1) // width) * width,
 #         ((src.size[1] + height-1) // height) * height,
 #         ))
@@ -93,47 +121,24 @@ def playSeq(src, intro, loops=1):
     
     playGif(intro, 1)
     playGif(src, loops)
-
-def getHeading(port):
     
-    try:
-        raw = port.readline().rstrip()
-        return int(raw[0:4].decode("utf-8"))
-    
-    except:
-        return 60 # 2 o'clock
-
-def close(h1, h2, tol=20):
-    
-    return abs(h1 - h2) < tol
-
-def maybe(default, x):
-    
-    try: x
-        
-    except: default
-        
-lower = 320
-upper = lower + 100
-trigger = 0
 
 while 1:
-    
+     
     if(compass.in_waiting > 0):
-        
-        time.sleep(0.1)
+         
+        # time.sleep(0.1)
         heading = getHeading(compass)
-        print(heading)
+        # print(heading)
         
         if close(trigger, heading):
             
             print("Playing Gif sequence")
-            playSeq(src2, intro, 4)
-            trigger = rng.randint(lower, upper) % 360
+            playSeq(src2, intro, 1)
+            trigger = rng.randint(heading + 20, heading + 100) % 360
             print("new trigger")
             print(trigger)
             print("done")
-            
         
         
 # playFrame(src1)
