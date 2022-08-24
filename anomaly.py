@@ -12,6 +12,7 @@ from picamera2.encoders import H264Encoder
 import numpy as np
 import serial as sp
 import random as gn
+# import struct as st
 
 # import cv2 as cv2
 from PIL import Image, GifImagePlugin
@@ -98,9 +99,13 @@ def travel(phi):
     return  window(psi) + offset
 
 def getHeading(port):
-    
+   
+    assert port.in_waiting >= 3
     raw = port.readline().rstrip()
-    proc = window(int(raw[0:4].decode("utf-8")))
+    proc = window(int(raw[0:3].decode("utf-8")))
+    # proc = window(raw[0:2].decode("utf-8"))
+    # proc = st.unpack('<h', raw[0:2])
+    # port.reset_input_buffer()
     return proc + offset
 
 
@@ -130,9 +135,8 @@ def playGif(gif, loc=center):
        
     picam2.set_overlay(None) 
 
-def playSeq(gifs, loc=center):
+def playSeq(gif, loc=center):
     
-    gif = gn.choice(gifs)
     playGif(intro, loc)
     playGif(gif, loc)
 
@@ -151,7 +155,7 @@ def fallback():
 
     gif = gn.choice(gifs)
     loc = (gn.randint(0, 1000000) % pixw, gn.randint(0, 1000000) % pixh)
-    playSeq(gifs, loc)
+    playSeq(gif, loc)
     period = gn.randint(20, 35)
     # time.sleep(period)
     time.sleep(1)
@@ -159,12 +163,16 @@ def fallback():
 
 try:
     try:
-        compass = sp.Serial(port = "/dev/ttyACM0", baudrate=9600, bytesize=8, timeout=2)
+        compass = sp.Serial(port = "/dev/ttyACM0", baudrate=9600, parity=sp.PARITY_NONE, bytesize=sp.EIGHTBITS, timeout=0)
+        compass.readline()
 
-    except:
-        compass = sp.Serial(port = "/dev/ttyACM1", baudrate=9600, bytesize=8, timeout=2)
+    except BaseException as err:
+        print(f"168: Unexpected {err=}, {type(err)=}")
+        compass = sp.Serial(port = "/dev/ttyACM1", baudrate=9600, parity=sp.PARITY_NONE, bytesize=sp.EIGHTBITS, timeout=0)
+        compass.readline()
 
-except:
+except BaseException as err:
+    print(f"173: Unexpected {err=}, {type(err)=}")
     fallback()
 
 # time.sleep(5)
@@ -178,13 +186,14 @@ while 1:
     if (keyboard.is_pressed('q')):
         sys.exit()
     
-    try:
-        assert compass.in_waiting > 0, "compass unavailable"
-        heading = getHeading(compass)
-        print(heading)
-        anomaly(heading, trigger) 
+    if compass.in_waiting > 0:
+        try:
+            heading = getHeading(compass)
+            print(heading)
+            anomaly(heading, trigger) 
 
-    except:
-        if (keyboard.is_pressed('q')):
-            sys.exit()
-        fallback()
+        except BaseException as err:
+            print(f"193: Unexpected {err=}, {type(err)=}")
+            if (keyboard.is_pressed('q')):
+                sys.exit()
+            fallback()
