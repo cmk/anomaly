@@ -4,7 +4,7 @@ import keyboard
 import time
 import sys
 
-# sys.path.insert(1, '/home/cmk/Documents/picamera2')
+sys.path.insert(1, '/home/cmk/Documents/picamera2')
 
 from picamera2 import Picamera2, Preview
 from picamera2.encoders import H264Encoder
@@ -17,14 +17,27 @@ import random as gn
 # import cv2 as cv2
 from PIL import Image, GifImagePlugin
 
+# mask = Image.open('mask.png')
+
+# TODO
+#  - ensure exposure is auto adjusted, else adjust exposure time to time of day
+#  - use server / EventHandlers and callbacks to draw gifs
+#    python should only process/insert images when triggered: picam2.post_callback = playFrame ?
+
 # Gif constants
 path = '/home/cmk/Documents/anomaly/gifs/'
 GifImagePlugin.LOADING_STRATEGY = 2
 
 # Image constants
 redux = 12
-pixw = 1728 # camw * redux
-pixh = 972 # camh * redux
+# pixh = 1728 # camw * redux
+# pixw = 972 # camh * redux
+# pixw = 1728 # camw * redux
+# pixh = 972 # camh * redux
+# pixh = 1920 # camw * redux
+# pixw = 1080 # camh * redux
+pixw = 1720 # camw * redux
+pixh = 1080 # camh * redux
 camw = pixw // redux
 camh = pixh // redux
 center = (pixw//2 - 250,pixh//2 - 250)
@@ -33,10 +46,9 @@ lores = {"size": (camw,camh), "format": "YUV420"}
 
 # Compass variables        
 offset = 0
-fovmax = 120 # field of view
-midpoint = offset + fovmax // 2
-margin = 8
-trigger = 0
+fovmax = 180 # field of view
+margin = 30
+triggers = [offset]
 
 # Load the images
 intro = Image.open(path + 'intro.gif')
@@ -46,72 +58,42 @@ for i in range(0, 31):
     gif = Image.open(path + 'A' + str(i) + '.gif')
     gifs.append(gif)
 
-# mask = Image.open('mask.png')
-
-# TODO
-#  - ensure exposure is auto adjusted, else adjust exposure time to time of day
-#  - use server / EventHandlers and callbacks to draw gifs
-#    python should only process/insert images when triggered: picam2.post_callback = playFrame ?
-
 # Sleep to allow X11 to finish booting
 time.sleep(10)
 
 
 gn.seed()
     
-# serialPort.open()
-
-
 picam2 = Picamera2()
 config = picam2.create_preview_configuration(main=lores)
 
 picam2.configure(config)
-picam2.start_preview(Preview.DRM, x=150, width=pixw, height=pixh)
-# picam2.start_preview(Preview.QTGL, width=pixw, height=pixh)
+# picam2.start_preview(Preview.DRM, width=pixw, height=pixh)
+picam2.start_preview(Preview.QTGL, x=200, width=pixw, height=pixh)
 # picam2.start_preview(Preview.QTGL, width=1920, height=1080)
 picam2.start()
 
-#picam2.configure("preview")
-#picam2.stfart(show_preview=True)
-
-
-# blank = np.zeros((camh, camw, 4), dtype=np.uint8)
-# blank[:,:] = (0,0,0,0)
-# blank[500:, :500] = (255, 0, 0, 128)
-# picam2.set_overlay(blank)
-
-
     
-def window(phi):
+def generate(maximum, offset=0):
 
-    return min(fovmax, abs(phi))
+    return (gn.randint(0, 1000000) % maximum) + offset
 
-def travel(phi):
-    
-    psi = gn.randint(midpoint + margin, fovmax)
-
-    if phi > midpoint:
-        psi = gn.randint(0, midpoint - margin)
-
-    print("psi: ")
-    print(psi)
-    
-    return  window(psi) + offset
 
 def getHeading(port):
    
-    assert port.in_waiting >= 3
     raw = port.readline().rstrip()
-    proc = window(int(raw[0:3].decode("utf-8")))
+    val =int(raw.decode("utf-8"))
     # proc = window(raw[0:2].decode("utf-8"))
     # proc = st.unpack('<h', raw[0:2])
-    # port.reset_input_buffer()
-    return proc + offset
+    port.reset_input_buffer()
+    return min(val, fovmax) + offset
 
 
 def close(h1, h2):
-    
-    return abs(h1 - h2) < margin
+   
+    w1 = min(h1, fovmax)
+    w2 = min(h2, fovmax)
+    return abs(w1 - w2) < margin
 
 def playFrame(gif, loc=center):
     
@@ -140,46 +122,48 @@ def playSeq(gif, loc=center):
     playGif(intro, loc)
     playGif(gif, loc)
 
-def anomaly(heading, trigger):
+def anomaly(heading):
 
+    trigger = triggers[0]
     if close(trigger, heading):
-        gif = gn.choice(gifs)
-        loc = (pixw//2 - 250 + gn.randint(-40, 40),pixh//2 - 250 + gn.randint(-20, 20))
-        playSeq(gif, loc)
-        trigger = travel(heading)
-        print("new trigger")
+        print(f"You found an anomaly! The heading was {trigger}.")
         print(trigger)
-        print("done")
+        gif = gn.choice(gifs)
+        loc = (pixw//2 - generate(pixw//2, -200), pixh//2 - generate(pixw//2, -200))
+        playSeq(gif, loc)
+        
+        while close(triggers[0], heading):
+            triggers.pop()
+            next_trigger = generate(fovmax, offset)
+            triggers.append(next_trigger)
+        
+        print(f"The next trigger heading is {next_trigger}.")
+        # print("new trigger")
+        # print(trig)
+        # print("done")
 
 def fallback():
 
     gif = gn.choice(gifs)
-    loc = (gn.randint(0, 1000000) % pixw, gn.randint(0, 1000000) % pixh)
+    loc = (generate(pixw), generate(pixh))
     playSeq(gif, loc)
     period = gn.randint(20, 35)
-    # time.sleep(period)
-    time.sleep(1)
+    time.sleep(period)
 
 
 try:
     try:
-        compass = sp.Serial(port = "/dev/ttyACM0", baudrate=9600, parity=sp.PARITY_NONE, bytesize=sp.EIGHTBITS, timeout=0)
+        compass = sp.Serial(port = "/dev/ttyACM0", baudrate=9600, parity=sp.PARITY_NONE, bytesize=sp.EIGHTBITS, timeout=0.1)
         compass.readline()
 
     except BaseException as err:
         print(f"168: Unexpected {err=}, {type(err)=}")
-        compass = sp.Serial(port = "/dev/ttyACM1", baudrate=9600, parity=sp.PARITY_NONE, bytesize=sp.EIGHTBITS, timeout=0)
+        compass = sp.Serial(port = "/dev/ttyACM1", baudrate=9600, parity=sp.PARITY_NONE, bytesize=sp.EIGHTBITS, timeout=0.1)
         compass.readline()
 
 except BaseException as err:
     print(f"173: Unexpected {err=}, {type(err)=}")
     fallback()
-
-# time.sleep(5)
-# gif = gn.choice(gifs)
-# playFrame(intro)
-# playSeq(gif, intro, 1)
-# sys.exit()
  
 while 1:
 
@@ -190,10 +174,10 @@ while 1:
         try:
             heading = getHeading(compass)
             print(heading)
-            anomaly(heading, trigger) 
+            anomaly(heading) 
 
         except BaseException as err:
-            print(f"193: Unexpected {err=}, {type(err)=}")
+            print(f"184: Unexpected {err=}, {type(err)=}")
             if (keyboard.is_pressed('q')):
                 sys.exit()
             fallback()
