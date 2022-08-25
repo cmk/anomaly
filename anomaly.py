@@ -24,8 +24,14 @@ from PIL import Image, GifImagePlugin
 #  - use server / EventHandlers and callbacks to draw gifs
 #    python should only process/insert images when triggered: picam2.post_callback = playFrame ?
 
+# System constants
+path = '/home/cmk/Documents/anomaly/'
+asleep = [False]
+awake_limit = 10.0
+state = [420]
+awake = [time.time()]
+
 # Gif constants
-path = '/home/cmk/Documents/anomaly/gifs/'
 GifImagePlugin.LOADING_STRATEGY = 2
 
 # Image constants
@@ -51,15 +57,16 @@ margin = 30
 triggers = [offset]
 
 # Load the images
-intro = Image.open(path + 'intro.gif')
+splash = Image.open(path + 'splash.png')
+intro = Image.open(path + 'gifs/' + 'intro.gif')
 gifs = []
 
 for i in range(0, 31):
-    gif = Image.open(path + 'A' + str(i) + '.gif')
+    gif = Image.open(path + 'gifs/' + 'A' + str(i) + '.gif')
     gifs.append(gif)
 
 # Sleep to allow X11 to finish booting
-time.sleep(10)
+time.sleep(20)
 
 
 gn.seed()
@@ -73,11 +80,10 @@ picam2.start_preview(Preview.QTGL, x=200, width=pixw, height=pixh)
 # picam2.start_preview(Preview.QTGL, width=1920, height=1080)
 picam2.start()
 
-    
-def generate(maximum, offset=0):
 
-    return (gn.randint(0, 1000000) % maximum) + offset
+def die():
 
+    sys.exit("The Anomaly has imploded!!! Please notify Anomaly camp at 7:15 and C")
 
 def getHeading(port):
    
@@ -86,14 +92,59 @@ def getHeading(port):
     # proc = window(raw[0:2].decode("utf-8"))
     # proc = st.unpack('<h', raw[0:2])
     port.reset_input_buffer()
-    return min(val, fovmax) + offset
+    return (val + offset) % 360
 
 
-def close(h1, h2):
+try:
+    try:
+        compass = sp.Serial(port = "/dev/ttyACM0", baudrate=9600, parity=sp.PARITY_NONE, bytesize=sp.EIGHTBITS, timeout=0.1)
+        compass.readline()
+
+    except BaseException as err:
+        print(f"168: Unexpected {err=}, {type(err)=}")
+        compass = sp.Serial(port = "/dev/ttyACM1", baudrate=9600, parity=sp.PARITY_NONE, bytesize=sp.EIGHTBITS, timeout=0.1)
+        compass.readline()
+
+    time.sleep(1)
+
+except BaseException as err:
+    print(f"173: Unexpected {err=}, {type(err)=}")
+    die()
+
+def reset(var, val):
+
+    var.pop()
+    var.append(val)
+
+def sleep(heading):
+
+    if asleep[0] == False:
+        reset(asleep, True)    
+        pad = Image.new('RGBA', (pixw, pixh))
+        pad.paste(splash)
+        picam2.set_overlay(np.array(pad))
+        print(f"Sleeping after {time.time() - awake[0]} seconds")
    
-    w1 = min(h1, fovmax)
-    w2 = min(h2, fovmax)
-    return abs(w1 - w2) < margin
+    reset(state, heading)
+    
+def wake(heading):
+
+    if asleep[0] == True:
+        reset(asleep, False)    
+        picam2.set_overlay(None) 
+        print(f"waking up after {time.time() - awake[0]} seconds")
+    
+    reset(state, heading)
+    reset(awake, time.time())
+
+def generate(maximum, offset=0):
+
+    return (gn.randint(0, 1000000) % maximum) + offset
+
+def close(h1, h2, tol=margin):
+    
+    delta = abs(h1 - h2)
+    return delta < tol
 
 def playFrame(gif, loc=center):
     
@@ -108,7 +159,6 @@ def playFrame(gif, loc=center):
     pad.paste(gif, loc)
     picam2.set_overlay(np.array(pad))
     gif.seek(frameIdx+1)
-
 
 def playGif(gif, loc=center):
     
@@ -125,7 +175,7 @@ def playSeq(gif, loc=center):
 def anomaly(heading):
 
     trigger = triggers[0]
-    if close(trigger, heading):
+    if not asleep[0] and close(trigger, heading):
         print(f"You found an anomaly! The heading was {trigger}.")
         print(trigger)
         gif = gn.choice(gifs)
@@ -133,9 +183,8 @@ def anomaly(heading):
         playSeq(gif, loc)
         
         while close(triggers[0], heading):
-            triggers.pop()
             next_trigger = generate(fovmax, offset)
-            triggers.append(next_trigger)
+            reset(triggers, next_trigger)
         
         print(f"The next trigger heading is {next_trigger}.")
         # print("new trigger")
@@ -150,34 +199,26 @@ def fallback():
     period = gn.randint(20, 35)
     time.sleep(period)
 
-
-try:
-    try:
-        compass = sp.Serial(port = "/dev/ttyACM0", baudrate=9600, parity=sp.PARITY_NONE, bytesize=sp.EIGHTBITS, timeout=0.1)
-        compass.readline()
-
-    except BaseException as err:
-        print(f"168: Unexpected {err=}, {type(err)=}")
-        compass = sp.Serial(port = "/dev/ttyACM1", baudrate=9600, parity=sp.PARITY_NONE, bytesize=sp.EIGHTBITS, timeout=0.1)
-        compass.readline()
-
-except BaseException as err:
-    print(f"173: Unexpected {err=}, {type(err)=}")
-    fallback()
- 
 while 1:
 
     if (keyboard.is_pressed('q')):
-        sys.exit()
+        die()
     
     if compass.in_waiting > 0:
         try:
             heading = getHeading(compass)
             print(heading)
+
+            if not close(heading, state[0], 20):
+                wake(heading)
+           
             anomaly(heading) 
+    
+            if time.time() - awake[0] > awake_limit:
+                sleep(heading)
 
         except BaseException as err:
             print(f"184: Unexpected {err=}, {type(err)=}")
             if (keyboard.is_pressed('q')):
-                sys.exit()
+                die()
             fallback()
