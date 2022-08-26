@@ -1,0 +1,12 @@
+  386  sudo apt install -y libopenjp2-7
+  387  sudo apt install -y python3-picamera-lite
+  388  sudo apt install -y python3-picamera2-lite
+  394  sudo pip3 install picamera2 --upgrade
+  397  sudo pip3 install picamera2>0.3.2 
+  399  sudo pip3 install picamera2>0.2.3
+  471  sudo apt-get install xclip
+  511  sudo pip3 install keyboard
+ 1113  sudo pip3 install PyOpenGL
+ 1136  sudo apt-get install xscreensaver
+ 1214  history | grep install
+ 1218  history | grep install > cmds.txt
