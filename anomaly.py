@@ -27,7 +27,7 @@ from PIL import Image, GifImagePlugin
 # System constants
 path = '/home/cmk/Documents/anomaly/'
 asleep = [False]
-awake_limit = 10.0
+awake_limit = 60.0
 state = [420]
 awake = [time.time()]
 
@@ -76,7 +76,7 @@ config = picam2.create_preview_configuration(main=lores)
 
 picam2.configure(config)
 # picam2.start_preview(Preview.DRM, width=pixw, height=pixh)
-picam2.start_preview(Preview.QTGL, x=200, width=pixw, height=pixh)
+picam2.start_preview(Preview.QTGL, width=pixw, height=pixh)
 # picam2.start_preview(Preview.QTGL, width=1920, height=1080)
 picam2.start()
 
